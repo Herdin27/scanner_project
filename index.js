@@ -11,7 +11,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors());
 
-var JsBarcode = require('jsbarcode');
+var jwt = require('jsonwebtoken');
 // const { DOMImplementation, XMLSerializer } = require('xmldom');
 const { db } = require('./db/db.config');
 var QRCode = require('qrcode')
@@ -47,7 +47,8 @@ app.get('/scanimage', async (req, res) => {
     // product.map(item => {
 
     // })
-    QRCode.toDataURL(`http://localhost:8080/scan/${product[0].nama_product}`, function (err, url) {
+    var token = jwt.sign({ nama_product: product[0].nama_product }, 'productScanner');
+    QRCode.toDataURL(`http://localhost:8080/scan/${token}`, function (err, url) {
         res.send(`
         <div>
             <img src=${url} alt="">
@@ -56,17 +57,27 @@ app.get('/scanimage', async (req, res) => {
     })
 })
 
-app.get('/scan/:nama_product', async (req, res) => {
+app.get('/scan/:hash', async (req, res) => {
     console.log(req.params)
-    let docRef = product.doc(req.params.nama_product)
-    await docRef.update({
-        status_scan: 'sudah discan'
-    })
-    res.send(`
-    <div>
-       <h1>SUKSES</h1>
-    <div>
-    `);
+    try {
+        var decoded = jwt.verify(req.params.hash, 'productScanner')
+        let docRef = product.doc(decoded.nama_product)
+        await docRef.update({
+            status_scan: 'sudah discan'
+        })
+        return res.send(`
+        <div>
+        <h1>SUKSES</h1>
+        <div>
+        `);
+    } catch (error) {
+        console.log(error)
+        return res.send(`
+        <div>
+        <h1>TOKEN TIDAK VALID !!</h1>
+        <div>
+        `);
+    }
 })
 
 server.listen(port, () =>
